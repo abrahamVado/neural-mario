@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NN Diagram — Ultra Smooth Wavy Thick Lines</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+    </script>
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #05060a;
+      color: #eaeef7;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      display: block;
+    }
+
+    #ui {
+      position: fixed;
+      left: 12px;
+      top: 12px;
+      z-index: 10;
+      background: rgba(10, 12, 20, 0.72);
+      border: 1px solid rgba(180, 200, 255, 0.18);
+      padding: 10px 12px;
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      width: 500px;
+      max-width: calc(100vw - 24px);
+    }
+
+    #ui h1 {
+      font-size: 14px;
+      margin: 0 0 8px;
+      font-weight: 750;
+      letter-spacing: .2px;
+    }
+
+    #ui .small {
+      font-size: 12px;
+      opacity: .85;
+      line-height: 1.35;
+    }
+
+    #ui .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    #ui label {
+      font-size: 12px;
+      opacity: .9;
+      width: 140px;
+    }
+
+    #ui input[type="range"] {
+      width: 100%;
+    }
+
+    #ui button {
+      background: rgba(120, 160, 255, 0.18);
+      color: #eaeef7;
+      border: 1px solid rgba(160, 190, 255, 0.25);
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 650;
+    }
+
+    #ui button:hover {
+      background: rgba(120, 160, 255, 0.26);
+    }
+
+    #readout {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="ui">
+
+    <h1>Ultra Smooth Neural Network <button id="minBtn"
+        style="float:right; margin-top:-2px; padding:2px 8px; font-size:10px; opacity:0.7">_</button></h1>
+    <div id="uiContent">
+      <div class="small">
+        Optimized for 60 FPS on most devices. Thick anchored wavy lines, glowing pulses, full controls.
+      </div>
+      <div class="row"><label>Speed</label><input id="speed" type="range" min="0" max="3" step="0.01" value="1.15" />
+      </div>
+      <div class="row"><label>Pulse Rate</label><input id="pulseRate" type="range" min="0" max="15" step="0.1"
+          value="4.0" /></div>
+      <div class="row"><label>Pulse Size</label><input id="pulseSize" type="range" min="0.2" max="2.8" step="0.01"
+          value="1.2" /></div>
+      <div class="row"><label>Node Glow</label><input id="nodeGlow" type="range" min="0" max="2.5" step="0.01"
+          value="1.25" /></div>
+      <div class="row"><label>Wave Amp</label><input id="waveAmp" type="range" min="0" max="1.2" step="0.01"
+          value="0.45" /></div>
+      <div class="row"><label>Wave Freq</label><input id="waveFreq" type="range" min="0.2" max="6" step="0.01"
+          value="2.4" /></div>
+      <div class="row"><label>Endpoint Tight</label><input id="endpointTight" type="range" min="1" max="6" step="0.1"
+          value="2.5" /></div>
+      <div class="row"><label>Attach Pad</label><input id="attachPad" type="range" min="0" max="0.7" step="0.01"
+          value="0.18" /></div>
+      <div class="row"><label>Base Width</label><input id="lineWidth" type="range" min="1" max="14" step="0.1"
+          value="4.5" /></div>
+      <div class="row"><label>Active Boost</label><input id="activeBoost" type="range" min="1" max="4" step="0.01"
+          value="2.3" /></div>
+      <div class="row"><label>Noise</label><input id="noise" type="range" min="0" max="1" step="0.01" value="0.14" />
+      </div>
+      <div class="row">
+        <button id="randomize">Randomize Weights</button>
+        <button id="pause">Pause</button>
+      </div>
+      <div id="readout" class="small">
+        <div><strong>Decision:</strong> <span id="decision" class="mono"></span></div>
+        <div style="margin-top:6px"><strong>Outputs:</strong> <span id="outputs" class="mono"></span></div>
+        <div style="margin-top:6px"><strong>Inputs:</strong> <span id="inputs" class="mono"></span></div>
+      </div>
+    </div> <!-- End Content -->
+  </div> <!-- End UI -->
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { Line2 } from "three/addons/lines/Line2.js";
+    import { LineMaterial } from "three/addons/lines/LineMaterial.js";
+    import { LineGeometry } from "three/addons/lines/LineGeometry.js";
+
+    const clamp01 = (x) => Math.max(0, Math.min(1, x));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const tanh = (x) => Math.tanh(x);
+    const softmax = (arr) => {
+      const m = Math.max(...arr);
+      const exps = arr.map(v => Math.exp(v - m));
+      const s = exps.reduce((a, b) => a + b, 0) || 1;
+      return exps.map(e => e / s);
+    };
+
+    function endpointEnvelope(t, tightness) {
+      const s = Math.sin(Math.PI * t);
+      return Math.pow(Math.max(0, s), tightness);
+    }
+
+    function quadBezier(p0, cp, p1, t) {
+      const a = (1 - t) * (1 - t);
+      const b = 2 * (1 - t) * t;
+      const c = t * t;
+      return new THREE.Vector3(a * p0.x + b * cp.x + c * p1.x, a * p0.y + b * cp.y + c * p1.y, a * p0.z + b * cp.z + c * p1.z);
+    }
+
+    function quadBezierDeriv(p0, cp, p1, t) {
+      return cp.clone().sub(p0).multiplyScalar(2 * (1 - t)).add(p1.clone().sub(cp).multiplyScalar(2 * t));
+    }
+
+    function insetEndpoints(p0, cp, p1, pad) {
+      if (pad <= 0) return { p0, p1 };
+      const d0 = quadBezierDeriv(p0, cp, p1, 0.001).normalize();
+      const d1 = quadBezierDeriv(p0, cp, p1, 0.999).normalize();
+      return { p0: p0.clone().add(d0.multiplyScalar(pad)), p1: p1.clone().add(d1.multiplyScalar(-pad)) };
+    }
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x05060a, 12, 90);
+    const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 400);
+    camera.position.set(0, 2.5, 26);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+    renderer.setClearColor(0x05060a, 1);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.32));
+    const key = new THREE.DirectionalLight(0xffffff, 0.9);
+    key.position.set(12, 16, 10);
+    scene.add(key);
+
+    const grid = new THREE.GridHelper(120, 60, 0x223344, 0x0f1220);
+    grid.position.y = -10;
+    grid.material.opacity = 0.18;
+    grid.material.transparent = true;
+    scene.add(grid);
+
+    const wavePlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(200, 120, 1, 1),
+      new THREE.ShaderMaterial({
+        transparent: true, depthWrite: false,
+        uniforms: { uTime: { value: 0 }, uOpacity: { value: 0.22 } },
+        vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+        fragmentShader: `
+            varying vec2 vUv; uniform float uTime; uniform float uOpacity;
+            float fbm(vec2 p){ float v=0.; float a=.5; for(int i=0;i<4;i++){ v+=a*sin(p.x)*cos(p.y); p*=1.7; a*=.55;} return v; }
+            void main(){
+              vec2 uv=vUv*2.-1.; float t=uTime*.35;
+              float w1=sin(uv.x*4.+t)*.35; float w2=cos(uv.y*6.-t*1.2)*.25; float n=fbm(uv*2.2+vec2(t,-t));
+              float waves=(w1+w2+n)*.6; float vignette=smoothstep(1.15,.2,length(uv));
+              float glow=smoothstep(.25,.95,waves+.5)*vignette;
+              vec3 col=vec3(.10,.18,.40)*glow;
+              gl_FragColor=vec4(col,uOpacity*glow);
+            }`
+      })
+    );
+    wavePlane.position.set(0, 0, -35);
+    scene.add(wavePlane);
+
+    const sizes = [17, 30, 30, 7];
+    const outputLabels = ["NOOP", "Derecha", "Der+Salto", "Der+Correr", "Der+S+C", "Salto", "Izquierda"];
+    const inputLabels = [
+      "Posición X", "Posición Y", "Velocidad X", "Velocidad Y",
+      "Grande", "Fuego",
+      "Enemigo 1 X", "Enemigo 1 Y",
+      "Enemigo 2 X", "Enemigo 2 Y",
+      "En Suelo", "Momento",
+      "Pared Frente", "Suelo Frente", "Suelo Medio", "Hueco", "Bloque Cabeza"
+    ];
+    const layerGap = 8.0;
+    const ySpan = 14.0;
+    const zJitter = 0.35;
+    const layerColors = [0x6a7cff, 0xb85cff, 0xff4f86, 0xffd04a].map(c => new THREE.Color(c));
+
+    function randW(inN, outN, scale = 1.0) { return Array.from({ length: inN }, () => Array.from({ length: outN }, () => (Math.random() * 2 - 1) * scale)); }
+    let W = [];
+    function randomizeWeights() { W = []; for (let l = 0; l < sizes.length - 1; l++) { W.push(randW(sizes[l], sizes[l + 1])); } }
+    randomizeWeights();
+
+    // State from Server
+    let currentActivations = [
+      new Array(sizes[0]).fill(0),
+      new Array(sizes[1]).fill(0),
+      new Array(sizes[2]).fill(0),
+      new Array(sizes[3]).fill(0)
+    ];
+    let currentDecision = 0;
+
+    // WebSocket Connection
+    const ws = new WebSocket("ws://localhost:8765");
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.inputs && data.inputs.length > 0) {
+        const safeUpdate = (targetIdx, sourceArr) => {
+          const len = Math.min(sizes[targetIdx], sourceArr.length);
+          const arr = currentActivations[targetIdx];
+          for (let i = 0; i < len; i++) arr[i] = sourceArr[i];
+        };
+
+        safeUpdate(0, data.inputs);
+        if (data.layers && data.layers[0]) safeUpdate(1, data.layers[0]);
+        if (data.layers && data.layers[1]) safeUpdate(2, data.layers[1]);
+        safeUpdate(3, data.outputs);
+
+        currentDecision = data.decision;
+      }
+    };
+
+    function computeVirtualEdgeSignals() {
+      const edgeSignals = [];
+      for (let l = 0; l < sizes.length - 1; l++) {
+        const inA = currentActivations[l];
+        const outA = currentActivations[l + 1];
+        const sig = [];
+        // Visualization: Signal = In * Out (Hebbian style)
+        for (let i = 0; i < sizes[l]; i++) {
+          for (let j = 0; j < sizes[l + 1]; j++) {
+            sig.push(Math.abs(inA[i] * outA[j]));
+          }
+        }
+        edgeSignals.push(sig);
+      }
+      return edgeSignals;
+    }
+
+    function createTextSprite(message, opts) {
+      const fontsize = opts.fontsize || 24;
+      const fontface = opts.fontface || "Arial";
+      const borderThickness = opts.borderThickness || 0;
+
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      context.font = "Bold " + fontsize + "px " + fontface;
+
+      const metrics = context.measureText(message);
+      const textWidth = metrics.width;
+
+      canvas.width = textWidth + borderThickness + 4;
+      canvas.height = fontsize * 1.4 + borderThickness;
+
+      context.font = "Bold " + fontsize + "px " + fontface;
+      context.fillStyle = "rgba(230, 240, 255, 0.9)";
+      context.fillText(message, borderThickness, fontsize);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+      const spriteMaterial = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true, opacity: 0.9 });
+      const sprite = new THREE.Sprite(spriteMaterial);
+      const scale = 0.015 * fontsize; // slightly smaller scale
+      sprite.scale.set(scale * canvas.width / canvas.height, scale, 1.0);
+      return sprite;
+    }
+
+    const layers = [];
+    const nodeGeo = new THREE.SphereGeometry(0.32, 22, 22);
+    for (let l = 0; l < sizes.length; l++) {
+      const x = (l - (sizes.length - 1) / 2) * layerGap;
+      const pos = [];
+      for (let i = 0; i < sizes[l]; i++) {
+        const t = sizes[l] === 1 ? 0.5 : i / (sizes[l] - 1);
+        const y = lerp(ySpan / 2, -ySpan / 2, t);
+        pos.push(new THREE.Vector3(x, y, (Math.random() * 2 - 1) * zJitter));
+      }
+      const nodes = pos.map((p, idx) => {
+        const mat = new THREE.MeshStandardMaterial({ color: layerColors[l], roughness: 0.4, metalness: 0.08, emissive: 0x000000, transparent: true, opacity: 0.35 });
+        const m = new THREE.Mesh(nodeGeo, mat);
+        m.position.copy(p);
+        scene.add(m);
+
+        // Add Input Labels
+        if (l === 0 && inputLabels[idx]) {
+          const spr = createTextSprite(inputLabels[idx], { fontsize: 42 });
+          spr.position.set(p.x - 1.2, p.y, p.z);
+          spr.center.set(1.0, 0.5); // Right aligned to point
+          scene.add(spr);
+        }
+        // Add Output Labels
+        if (l === sizes.length - 1 && outputLabels[idx]) {
+          const spr = createTextSprite(outputLabels[idx], { fontsize: 42 });
+          spr.position.set(p.x + 1.2, p.y, p.z);
+          spr.center.set(0.0, 0.5); // Left aligned
+          scene.add(spr);
+        }
+
+        return m;
+      });
+      layers.push({ nodes, positions: pos });
+    }
+
+    function resetNodes() { layers.forEach(l => l.nodes.forEach(n => { n.material.emissive.setRGB(0, 0, 0); n.material.opacity = 0.35; n.scale.setScalar(1); })); }
+    function lightNode(l, i, a, s) {
+      const n = layers[l]?.nodes[i]; if (!n) return;
+      a = clamp01(a);
+      n.material.emissive.setRGB(a * 1.2 * s, a * 1.25 * s, a * 1.6 * s);
+      n.material.opacity = lerp(n.material.opacity, 1, a);
+      n.scale.setScalar(lerp(n.scale.x, 1.65, a));
+    }
+
+    const SAMPLES = 12; // Reduced from 20 for performance
+    const connections = [];
+    function buildConnections(lFrom, lTo, baseColor) {
+      const from = layers[lFrom].positions;
+      const to = layers[lTo].positions;
+      const lines = [], meta = [], buffers = [];
+      for (let i = 0; i < from.length; i++) for (let j = 0; j < to.length; j++) {
+        const p0 = from[i].clone();
+        const p1 = to[j].clone();
+        const mid = p0.clone().add(p1).multiplyScalar(0.5);
+        const dir = p1.clone().sub(p0);
+        const normal = new THREE.Vector3(-dir.y, dir.x, 0).normalize();
+        const bend = 0.14 + 0.10 * (j / Math.max(1, to.length - 1));
+        const cp = mid.add(normal.multiplyScalar(bend * dir.length()));
+
+        const buf = new Float32Array(SAMPLES * 3);
+        const geom = new LineGeometry();
+        geom.setPositions(buf);
+        const mat = new LineMaterial({ color: baseColor.getHex(), linewidth: 4.5, transparent: true, opacity: 0.08, depthWrite: false, blending: THREE.AdditiveBlending });
+        mat.resolution.set(innerWidth, innerHeight);
+        const line = new Line2(geom, mat);
+        // Optimization: tag sleeping
+        line.userData = { sleeping: false };
+        scene.add(line);
+
+        lines.push(line);
+        meta.push({ p0, p1, cp, baseColor: baseColor.clone() });
+        buffers.push(buf);
+      }
+      return { lines, meta, buffers };
+    }
+
+    for (let l = 0; l < sizes.length - 1; l++) {
+      const c = layerColors[l].clone().lerp(layerColors[l + 1], 0.5);
+      connections.push(buildConnections(l, l + 1, c));
+    }
+
+    const active = connections.map(g => new Float32Array(g.meta.length).fill(0));
+
+    function decayActive(dt) {
+      const d = Math.exp(-dt * 6.5);
+      active.forEach(a => { for (let i = 0; i < a.length; i++) a[i] *= d; });
+    }
+
+    const tempBase = new THREE.Vector3();
+    const tempDeriv = new THREE.Vector3();
+    const tempNormal = new THREE.Vector3();
+
+    function updateWaves(time, waveAmp, waveFreq, edgeSignals, baseWidth, boostMult, tightness, attachPad, frameId) {
+      for (let l = 0; l < connections.length; l++) {
+        const group = connections[l];
+        const sig = edgeSignals[l];
+        let maxS = 1e-6;
+        for (let i = 0; i < sig.length; i++) maxS = Math.max(maxS, sig[i]);
+
+        for (let idx = 0; idx < group.meta.length; idx++) {
+          const m = group.meta[idx];
+          const line = group.lines[idx];
+          const strength = sig[idx] / maxS;
+          const used = active[l][idx];
+
+          // Material updates are cheap, do them every frame for smoothness
+          line.material.linewidth = baseWidth * (1 + used * (boostMult - 1));
+          line.material.opacity = 0.05 + 0.12 * strength + 0.75 * used;
+          line.material.color.copy(m.baseColor.clone().lerp(new THREE.Color(1, 1, 1), 0.35 * used));
+
+          // sleep check
+          if (used < 0.01 && strength < 0.01) {
+            if (!line.userData.sleeping) {
+              line.userData.sleeping = true;
+            }
+          } else {
+            line.userData.sleeping = false;
+          }
+
+          if (line.userData.sleeping) continue;
+
+          // Staggered Geometry Update: Only update 1/3 of active lines per frame
+          if ((idx + l + frameId) % 3 !== 0) continue;
+
+          const buf = group.buffers[idx];
+          const inset = insetEndpoints(m.p0, m.cp, m.p1, attachPad);
+          const p0 = inset.p0;
+          const p1 = inset.p1;
+          const cp = m.cp;
+
+          for (let s = 0; s < SAMPLES; s++) {
+            const t = s / (SAMPLES - 1);
+            tempBase.copy(quadBezier(p0, cp, p1, t));
+
+            const env = endpointEnvelope(t, tightness);
+
+            const phase = time * 2.2 + t * Math.PI * 2 * waveFreq + idx * 0.03;
+            const wave = Math.sin(phase);
+            const amp = waveAmp * (0.1 + 0.55 * strength + 0.85 * used) * env;
+
+            tempDeriv.copy(quadBezierDeriv(p0, cp, p1, t));
+            const tangent = tempDeriv.lengthSq() > 1e-8 ? tempDeriv.normalize() : new THREE.Vector3(1, 0, 0);
+            tempNormal.set(-tangent.y, tangent.x, 0).normalize();
+            tempBase.add(tempNormal.multiplyScalar(amp));
+
+            const off = s * 3;
+            buf[off] = tempBase.x;
+            buf[off + 1] = tempBase.y;
+            buf[off + 2] = tempBase.z;
+          }
+
+          line.geometry.setPositions(buf);
+        }
+      }
+    }
+
+    const glowTex = (() => {
+      const c = document.createElement("canvas"); c.width = c.height = 128;
+      const ctx = c.getContext("2d");
+      const g = ctx.createRadialGradient(64, 64, 6, 64, 64, 64);
+      g.addColorStop(0, "#fff"); g.addColorStop(0.2, "#bef0ff"); g.addColorStop(0.55, "#78a0ff"); g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 128, 128);
+      const tex = new THREE.CanvasTexture(c);
+      tex.minFilter = tex.magFilter = THREE.LinearFilter;
+      return tex;
+    })();
+
+    const pulses = [];
+    const MAX_PULSES = 100;
+
+    function spawnPulse(l, idx, intensity) {
+      if (pulses.length >= MAX_PULSES) return;
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffffff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
+      spr.userData = { l, idx, t: 0, speed: 0.55 + 1.6 * intensity, intensity };
+      scene.add(spr);
+      pulses.push(spr);
+    }
+
+    function updatePulses(dt, size, waveAmp, waveFreq, time, glowScale, tightness, attachPad) {
+      for (let i = pulses.length - 1; i >= 0; i--) {
+        const p = pulses[i];
+        const ud = p.userData;
+        ud.t += dt * ud.speed;
+        if (ud.t >= 1) { scene.remove(p); p.material.dispose(); pulses.splice(i, 1); continue; }
+        active[ud.l][ud.idx] = Math.max(active[ud.l][ud.idx], 0.65 + 0.35 * ud.intensity);
+        const group = connections[ud.l];
+        const m = group.meta[ud.idx];
+        const inset = insetEndpoints(m.p0, m.cp, m.p1, attachPad);
+        const base = quadBezier(inset.p0, m.cp, inset.p1, ud.t);
+        const env = endpointEnvelope(ud.t, tightness);
+        const phase = time * 2.2 + ud.t * Math.PI * 2 * waveFreq + ud.idx * 0.03;
+        const wave = Math.sin(phase);
+        const amp = waveAmp * env;
+        const deriv = quadBezierDeriv(inset.p0, m.cp, inset.p1, ud.t);
+        const tangent = deriv.lengthSq() > 1e-8 ? deriv.normalize() : new THREE.Vector3(1, 0, 0);
+        const normal = new THREE.Vector3(-tangent.y, tangent.x, 0).normalize();
+        p.position.copy(base.add(normal.multiplyScalar(wave * amp)));
+        p.scale.setScalar(size * (0.35 + 1.25 * ud.intensity));
+        p.material.opacity = 0.95 * (1 - Math.pow(ud.t, 1.6));
+      }
+    }
+
+    function sampleInputs(t, noise) {
+      return Array(sizes[0]).fill(0).map((_, i) => clamp01(0.5 + 0.5 * Math.sin(t * (0.25 + i * 0.02) + i * 0.7) + (Math.random() * 2 - 1) * noise));
+    }
+
+    const els = {
+      speed: document.getElementById("speed"),
+      pulseRate: document.getElementById("pulseRate"),
+      pulseSize: document.getElementById("pulseSize"),
+      nodeGlow: document.getElementById("nodeGlow"),
+      waveAmp: document.getElementById("waveAmp"),
+      waveFreq: document.getElementById("waveFreq"),
+      endpointTight: document.getElementById("endpointTight"),
+      attachPad: document.getElementById("attachPad"),
+      lineWidth: document.getElementById("lineWidth"),
+      activeBoost: document.getElementById("activeBoost"),
+      noise: document.getElementById("noise"),
+      decision: document.getElementById("decision"),
+      outputs: document.getElementById("outputs"),
+      inputs: document.getElementById("inputs")
+    };
+    document.getElementById("randomize").addEventListener("click", randomizeWeights);
+    let paused = false;
+    document.getElementById("pause").addEventListener("click", () => {
+      paused = !paused;
+      document.getElementById("pause").textContent = paused ? "Resume" : "Pause";
+    });
+
+    document.getElementById("minBtn").addEventListener("click", () => {
+      const content = document.getElementById("uiContent");
+      if (content.style.display === "none") {
+        content.style.display = "block";
+        document.getElementById("minBtn").textContent = "_";
+      } else {
+        content.style.display = "none";
+        document.getElementById("minBtn").textContent = "□";
+      }
+    });
+
+    const clock = new THREE.Clock();
+    let tAccum = 0, pulseAcc = 0;
+    let frameId = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      frameId++;
+
+      controls.update();
+      const dt = clock.getDelta();
+
+      const params = {
+        speed: +els.speed.value,
+        pulseRate: +els.pulseRate.value,
+        pulseSize: +els.pulseSize.value,
+        nodeGlow: +els.nodeGlow.value,
+        waveAmp: +els.waveAmp.value,
+        waveFreq: +els.waveFreq.value,
+        tightness: +els.endpointTight.value,
+        attachPad: +els.attachPad.value,
+        baseWidth: +els.lineWidth.value,
+        boostMult: +els.activeBoost.value,
+        noise: +els.noise.value
+      };
+
+      wavePlane.material.uniforms.uTime.value += dt;
+      if (!paused) tAccum += dt * params.speed;
+
+      const activations = currentActivations;
+      const edgeSignals = computeVirtualEdgeSignals();
+      const input = activations[0];
+
+      decayActive(dt);
+      resetNodes();
+
+      if (!paused) {
+        pulseAcc += dt * params.pulseRate;
+        const spawn = Math.floor(pulseAcc); pulseAcc -= spawn;
+        for (let s = 0; s < spawn; s++) {
+          for (let l = 0; l < edgeSignals.length; l++) {
+            const sig = edgeSignals[l];
+            const maxS = Math.max(...sig, 1e-6);
+            const top = sig.reduce((best, v, i) => v > best.v ? { v, i } : best, { v: -Infinity, i: -1 });
+            if (top.i !== -1) spawnPulse(l, top.i, top.v / maxS);
+          }
+        }
+      }
+
+      updatePulses(dt, params.pulseSize, params.waveAmp, params.waveFreq, tAccum, params.nodeGlow, params.tightness, params.attachPad);
+      updateWaves(tAccum, params.waveAmp, params.waveFreq, edgeSignals, params.baseWidth, params.boostMult, params.tightness, params.attachPad, frameId);
+
+      const out = activations[activations.length - 1];
+      const best = currentDecision;
+      els.decision.textContent = outputLabels[best] ?? `CLASS_${best}`;
+      els.outputs.textContent = out.map((p, i) => `${outputLabels[i] ?? i}:${p.toFixed(3)}`).join(" ");
+      els.inputs.textContent = input.slice(0, 10).map(v => v.toFixed(2)).join(" ");
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      connections.forEach(g => g.lines.forEach(l => l.material.resolution.set(innerWidth, innerHeight)));
+    });
+  </script>
+</body>
+
+</html>
