@@ -6,7 +6,7 @@ This project demonstrates a Reinforcement Learning agent (DQN) learning to play 
 
 Unlike standard black-box AI demos, this project features a **Real-Time 3D Neural Network Viewer** that runs in your web browser, allowing you to see exactly what the agent "sees" and "thinks" as it plays.
 
-![Mario Visualization](viwer.PNG) 
+![Mario Visualization](viewer.PNG) 
 ![Mario Visualization](training.PNG)
 ![Mario Visualization](mario.PNG) 
 ## Features
