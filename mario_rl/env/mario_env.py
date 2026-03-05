@@ -1,9 +1,12 @@
 """Super Mario Bros environment wrapper for RL training."""
 from __future__ import annotations
+
+from typing import Any
+
 import gym_super_mario_bros
+import numpy as np
 from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
 from nes_py.wrappers import JoypadSpace
-import numpy as np
 
 
 class MarioEnv:
@@ -50,6 +53,23 @@ class MarioEnv:
         self.prev_x_pos = 0
         self.max_x_pos = 0
 
+    @staticmethod
+    def _unwrap_reset_result(reset_result: Any) -> tuple[Any, dict[str, Any]]:
+        """Normalize Gym reset outputs across API versions."""
+        if isinstance(reset_result, tuple) and len(reset_result) == 2:
+            obs, info = reset_result
+            return obs, info
+        return reset_result, {}
+
+    @staticmethod
+    def _unwrap_step_result(step_result: Any) -> tuple[Any, float, bool, dict[str, Any]]:
+        """Normalize Gym step outputs across API versions."""
+        if isinstance(step_result, tuple) and len(step_result) == 5:
+            obs, reward, terminated, truncated, info = step_result
+            return obs, reward, terminated or truncated, info
+        obs, reward, done, info = step_result
+        return obs, reward, done, info
+
         
     def reset(self) -> np.ndarray:
         """Reset environment and return initial state."""
@@ -61,13 +81,15 @@ class MarioEnv:
         self.stuck_frames = 0
         self.enemy_history = {} # Track enemy positions for velocity: {slot_id: (x, y)}
         
-        obs = self.env.reset()
+        obs, reset_info = self._unwrap_reset_result(self.env.reset())
         
         # 🍄 SUPER POWER INJECTION 🍄
         if self.apply_cheats:
             self.env.unwrapped.ram[0x0756] = 2 # Force Fire Mario
             
         info = self.env.unwrapped._get_info()
+        if reset_info:
+            info.update(reset_info)
 
         
         return self._extract_features(obs, info)
@@ -83,11 +105,12 @@ class MarioEnv:
         
         # Repeat action 4 times (frame skipping)
         for _ in range(4):
-            obs, reward, done, info = self.env.step(action)
+            obs, reward, done, info = self._unwrap_step_result(self.env.step(action))
             
             # Custom reward shaping
-            r = self._shape_reward(info, done)
+            r, force_done = self._shape_reward(info, done)
             total_reward += r
+            done = done or force_done
             
             if done:
                 break
@@ -266,11 +289,12 @@ class MarioEnv:
         
         return ram[offset]
 
-    def _shape_reward(self, info, done) -> float:
+    def _shape_reward(self, info, done) -> tuple[float, bool]:
         """Custom reward shaping using RAM info."""
         x_pos = info.get('x_pos', 0)
         score = info.get('score', 0)
         coins = info.get('coins', 0)
+        force_done = False
         
         # Reward for moving right
         reward = (x_pos - self.prev_x_pos) * 0.1
@@ -310,7 +334,7 @@ class MarioEnv:
             
         # FORCE RESTART IF STUCK
         if self.stuck_frames > 250: # ~4 seconds
-            done = True
+            force_done = True
             reward -= 10.0 # Heavy penalty for needing force reset
         
         # Big reward for reaching flag
@@ -331,7 +355,7 @@ class MarioEnv:
         if m_vx > 40: # Running speed
             reward += 0.1
             
-        return reward
+        return reward, force_done
 
     def render(self):
         """Render the game (for debugging)."""
