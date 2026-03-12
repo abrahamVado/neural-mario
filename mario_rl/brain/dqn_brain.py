@@ -45,7 +45,7 @@ class SimpleDQNAgent:
             return random.randint(0, self.action_dim - 1)
         
         with torch.no_grad():
-            state_t = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+            state_t = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             q_values = self.q_net(state_t)
             return q_values.argmax().item()
     
@@ -110,7 +110,7 @@ class SimpleDQNAgent:
     
     def load(self, path):
         """Load model checkpoint."""
-        checkpoint = torch.load(path)
+        checkpoint = torch.load(path, map_location=self.device)
         self.q_net.load_state_dict(checkpoint['q_net'])
         
         # Robust loading for transfer learning (partial checkpoints)

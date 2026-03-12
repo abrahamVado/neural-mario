@@ -1,16 +1,17 @@
 """Train DQN agent to play Super Mario Bros - Self-contained version."""
 from __future__ import annotations
+
 import os
+import logging
+import random
+
+import numpy as np
 import torch
 from tqdm import tqdm
 
 from mario_rl.env.mario_env import MarioEnv
-from mario_rl.agents.networks import MarioQNetwork
 from mario_rl.brain.dqn_brain import SimpleDQNAgent
 from mario_rl.utils.server import start_background_server, update_visualization
-import logging
-import numpy as np
-import random
 
 
 def train():
@@ -55,7 +56,7 @@ def train():
     if os.path.exists("checkpoints/latest.pt"):
         try:
             # Try to load just to check
-            dummy = torch.load("checkpoints/latest.pt")
+            torch.load("checkpoints/latest.pt", map_location=device)
             # If shape mismatch, it might not fail until load_state_dict, 
             # but let's be safe: if user said "Go ahead" knowing it's a restart,
             # we should archive the old ones to avoid confusion.
@@ -64,7 +65,7 @@ def train():
             # we don't want to archive it!
             # Let's assume if it fails to load, THEN we archive.
             pass
-        except:
+        except Exception:
             pass
             
     # Resume Training: Load Latest Model if exists
@@ -114,7 +115,7 @@ def train():
             
             # --- Visualization & Action Selection ---
             with torch.no_grad():
-                state_t = torch.FloatTensor(state).unsqueeze(0).to(device)
+                state_t = torch.as_tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
                 q_values, activations = agent.q_net.forward_with_activations(state_t)
                 
                 # Epsilon Greedy
