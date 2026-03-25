@@ -1,12 +1,15 @@
 """Watch Mario Play with Real-Time Web Visualization!"""
+
 import os
-import torch
-import time
-import json
 import asyncio
+import json
 import threading
+import time
+
 import numpy as np
+import torch
 import websockets
+
 from mario_rl.env.mario_env import MarioEnv
 from mario_rl.brain.dqn_brain import SimpleDQNAgent
 
@@ -32,7 +35,7 @@ async def ws_handler(websocket):
     try:
         while True:
             with lock:
-                data = latest_data
+                data = latest_data.copy()
             if data['inputs']: # Only send if we have data
                 await websocket.send(json.dumps(data))
             await asyncio.sleep(0.04) # ~25 FPS updates
@@ -85,7 +88,7 @@ def watch():
             
             # Get Action and Activations
             with torch.no_grad():
-                state_t = torch.FloatTensor(state).unsqueeze(0).to(device)
+                state_t = torch.as_tensor(state, dtype=torch.float32, device=device).unsqueeze(0)
                 
                 # Check directly if using random (epsilon) or network
                 # For visualization, we always want to run the network to see activations

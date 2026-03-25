@@ -1,8 +1,9 @@
 import asyncio
-import websockets
 import json
 import threading
+
 import numpy as np
+import websockets
 
 # Global shared state
 latest_data = {
@@ -12,6 +13,7 @@ latest_data = {
     "inputs": []
 }
 lock = threading.Lock()
+server_thread = None
 
 def downsample(arr, target_n):
     """Downsample a numpy array to target_n elements."""
@@ -25,7 +27,7 @@ async def ws_handler(websocket):
     try:
         while True:
             with lock:
-                data = latest_data
+                data = latest_data.copy()
             if data['inputs']:
                 await websocket.send(json.dumps(data))
             await asyncio.sleep(0.04) # ~25 FPS updates
@@ -41,8 +43,13 @@ def run_server_thread():
     asyncio.run(start_server())
 
 def start_background_server():
+    global server_thread
+    if server_thread is not None and server_thread.is_alive():
+        return server_thread
+
     server_thread = threading.Thread(target=run_server_thread, daemon=True)
     server_thread.start()
+    return server_thread
 
 def select_meaningful_inputs(arr):
     """Select specific meaningful indices for visualization."""
