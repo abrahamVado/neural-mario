@@ -29,6 +29,14 @@ class MarioEnv:
         NOOP, RIGHT, RIGHT+A (jump), RIGHT+B (run),
         RIGHT+A+B (run+jump), A (jump), LEFT
     """
+
+    GRID_ROWS = 13
+    GRID_COLS = 14
+    ENEMY_SLOTS = 3
+    ENEMY_FEATURES = 4
+    BASE_FEATURES = 8
+    HELPER_FEATURES = 2
+    STATE_DIM = BASE_FEATURES + (ENEMY_SLOTS * ENEMY_FEATURES) + (GRID_ROWS * GRID_COLS) + HELPER_FEATURES
     
     def __init__(self, world: int = 1, stage: int = 1, max_steps: int = 5000, apply_cheats: bool = False):
 
@@ -208,7 +216,7 @@ class MarioEnv:
         grid_features = []
         
         # Iterate rows 0 (top) to 12 (bottom)
-        for row in range(13):
+        for row in range(self.GRID_ROWS):
              for col in range(start_col, end_col + 1):
                  tile_val = self._get_tile_at(ram, col, row)
                  
@@ -248,7 +256,7 @@ class MarioEnv:
             has_momentum,     # 28: Has running momentum?
         ]
         
-        # Total Dimension: 8 + 12 + 182 = 202
+        # Total Dimension: 8 + 12 + 182 + 2 = 204
         return np.array(features, dtype=np.float32)
 
     def _get_tile_at(self, ram, col, row):

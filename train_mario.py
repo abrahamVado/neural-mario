@@ -20,7 +20,7 @@ def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\n🍄 Starting Mario RL Training!")
     print(f"Device: {device}")
-    print(f"Network: 204 (Grid+Helpers) → 256 → 256 → 7")
+    print(f"Network: {MarioEnv.STATE_DIM} (Grid+Helpers) → 256 → 256 → 7")
     print("-" * 50)
 
     # Setup logging
@@ -40,8 +40,7 @@ def train():
     # Enable 'apply_cheats' to give Mario infinite Fire Flower! 🍄🔥
     env = MarioEnv(world=1, stage=1, max_steps=5000, apply_cheats=False)
     
-    # State Dim = 204 (Grid features + Long Jump helpers)
-    agent = SimpleDQNAgent(state_dim=204, action_dim=7, device=device)
+    agent = SimpleDQNAgent(state_dim=MarioEnv.STATE_DIM, action_dim=7, device=device)
     
     # Training
     num_episodes = 5000

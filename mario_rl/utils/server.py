@@ -5,6 +5,8 @@ import threading
 import numpy as np
 import websockets
 
+from mario_rl.env.mario_env import MarioEnv
+
 # Global shared state
 latest_data = {
     "layers": [],
@@ -53,9 +55,9 @@ def start_background_server():
 
 def select_meaningful_inputs(arr):
     """Select specific meaningful indices for visualization."""
-    # Strict check: 204 is expected. If significantly less, downsample.
-    if len(arr) < 200: 
-        print(f"⚠️ Input size mismatch: {len(arr)} (Expected 204). Downsampling.")
+    # Strict check: MarioEnv.STATE_DIM is expected. If significantly less, downsample.
+    if len(arr) < MarioEnv.STATE_DIM:
+        print(f"⚠️ Input size mismatch: {len(arr)} (Expected {MarioEnv.STATE_DIM}). Downsampling.")
         return downsample(arr, 17)
     
     # Indices based on mario_env.py structure
