@@ -1,69 +1,25 @@
 """Watch Mario Play with Real-Time Web Visualization!"""
 
 import os
-import asyncio
-import json
-import threading
 import time
 
 import numpy as np
 import torch
-import websockets
 
-from mario_rl.env.mario_env import MarioEnv
 from mario_rl.brain.dqn_brain import SimpleDQNAgent
-
-# Global state for the visualization
-latest_data = {
-    "layers": [],
-    "outputs": [],
-    "decision": 0,
-    "inputs": []
-}
-lock = threading.Lock()
-
-def downsample(arr, target_n):
-    """Downsample a numpy array to target_n elements."""
-    if len(arr) <= target_n:
-        return arr.tolist()
-    # Simple sampling
-    indices = np.linspace(0, len(arr) - 1, target_n, dtype=int)
-    return arr[indices].tolist()
-
-async def ws_handler(websocket):
-    print("New client connected!")
-    try:
-        while True:
-            with lock:
-                data = latest_data.copy()
-            if data['inputs']: # Only send if we have data
-                await websocket.send(json.dumps(data))
-            await asyncio.sleep(0.04) # ~25 FPS updates
-    except websockets.exceptions.ConnectionClosed:
-        pass
-
-async def start_server():
-    print("🚀 WebSocket server starting on ws://localhost:8765")
-    async with websockets.serve(ws_handler, "localhost", 8765):
-        await asyncio.Future() # Run forever
-
-def run_server_thread():
-    asyncio.run(start_server())
+from mario_rl.env.mario_env import MarioEnv
+from mario_rl.utils.server import start_background_server, update_visualization
 
 def watch():
-    global latest_data
-    
     # Start WS Server
-    server_thread = threading.Thread(target=run_server_thread, daemon=True)
-    server_thread.start()
+    start_background_server()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"👀 Watching Mario on {device}")
     
     # Setup
     env = MarioEnv(world=1, stage=1, apply_cheats=False)
-    # Using the dimensions from the file directly
-    agent = SimpleDQNAgent(state_dim=204, action_dim=7, device=device)
+    agent = SimpleDQNAgent(state_dim=MarioEnv.STATE_DIM, action_dim=7, device=device)
     
     # Load Model
     if os.path.exists("checkpoints/latest.pt"):
@@ -103,22 +59,8 @@ def watch():
                 else:
                     action = q_values.argmax().item()
             
-            # Prepare data for WS
-            # Mapping: input -> hidden1 -> hidden2 -> output
-            # We downsample hidden layers for visual clarity
-            vis_input = downsample(activations['input'], 20)
-            vis_h1 = downsample(activations['hidden1'], 25)
-            vis_h2 = downsample(activations['hidden2'], 25)
-            vis_out = activations['output'].tolist()
+            update_visualization(activations, action)
             
-            with lock:
-                latest_data = {
-                    "inputs": vis_input,
-                    "layers": [vis_h1, vis_h2], # Middle layers
-                    "outputs": vis_out,
-                    "decision": action
-                }
-
             # Step
             next_state, reward, done, info = env.step(action)
             total_reward += reward
