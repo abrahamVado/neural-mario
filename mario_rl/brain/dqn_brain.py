@@ -1,9 +1,13 @@
 """DQN Brain for Mario."""
 from __future__ import annotations
-import torch
-import numpy as np
+
 from collections import deque
+import os
 import random
+
+import numpy as np
+import torch
+
 from mario_rl.agents.networks import MarioQNetwork
 
 class SimpleDQNAgent:
@@ -62,11 +66,11 @@ class SimpleDQNAgent:
         batch = random.sample(self.memory, self.batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
         
-        states = torch.FloatTensor(np.array(states)).to(self.device)
-        actions = torch.LongTensor(actions).to(self.device)
-        rewards = torch.FloatTensor(rewards).to(self.device)
-        next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
-        dones = torch.FloatTensor(dones).to(self.device)
+        states = torch.as_tensor(np.array(states), dtype=torch.float32, device=self.device)
+        actions = torch.as_tensor(actions, dtype=torch.long, device=self.device)
+        rewards = torch.as_tensor(rewards, dtype=torch.float32, device=self.device)
+        next_states = torch.as_tensor(np.array(next_states), dtype=torch.float32, device=self.device)
+        dones = torch.as_tensor(dones, dtype=torch.float32, device=self.device)
         
         # Current Q values
         current_q = self.q_net(states).gather(1, actions.unsqueeze(1)).squeeze()
@@ -101,6 +105,9 @@ class SimpleDQNAgent:
     
     def save(self, path):
         """Save model checkpoint."""
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
         torch.save({
             'q_net': self.q_net.state_dict(),
             'target_net': self.target_net.state_dict(),
