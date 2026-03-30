@@ -9,18 +9,22 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from mario_rl.config import DEFAULT_CONFIG
 from mario_rl.env.mario_env import MarioEnv
 from mario_rl.brain.dqn_brain import SimpleDQNAgent
 from mario_rl.utils.server import start_background_server, update_visualization
+from mario_rl.utils.checkpoints import archive_checkpoint, ensure_directory
 
 
 def train():
     """Train Mario DQN agent."""
+    config = DEFAULT_CONFIG
+
     # Setup
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"\n🍄 Starting Mario RL Training!")
     print(f"Device: {device}")
-    print(f"Network: {MarioEnv.STATE_DIM} (Grid+Helpers) → 256 → 256 → 7")
+    print(f"Network: {config.state_dim} (Grid+Helpers) → 256 → 256 → 7")
     print("-" * 50)
 
     # Setup logging
@@ -35,27 +39,26 @@ def train():
     # Start Visualization Server
     start_background_server()
 
-    
     # Create environment and agent
     # Enable 'apply_cheats' to give Mario infinite Fire Flower! 🍄🔥
-    env = MarioEnv(world=1, stage=1, max_steps=5000, apply_cheats=False)
-    
-    agent = SimpleDQNAgent(state_dim=MarioEnv.STATE_DIM, action_dim=7, device=device)
-    
-    # Training
-    num_episodes = 5000
-    save_interval = 50
-    
-    os.makedirs("checkpoints", exist_ok=True)
+    env = MarioEnv(
+        world=config.world,
+        stage=config.stage,
+        max_steps=config.max_steps,
+        apply_cheats=config.apply_cheats,
+    )
+    agent = SimpleDQNAgent(state_dim=config.state_dim, action_dim=config.action_dim, device=device)
+
+    ensure_directory(config.checkpoint_dir)
     
     # CHECKPOINT COMPATIBILITY CHECK
     # Because we changed the architecture/input size, old checkpoints will fail.
     # We should detect if we need to start fresh or archive them.
     
-    if os.path.exists("checkpoints/latest.pt"):
+    if os.path.exists(config.latest_checkpoint):
         try:
             # Try to load just to check
-            torch.load("checkpoints/latest.pt", map_location=device)
+            torch.load(config.latest_checkpoint, map_location=device)
             # If shape mismatch, it might not fail until load_state_dict, 
             # but let's be safe: if user said "Go ahead" knowing it's a restart,
             # we should archive the old ones to avoid confusion.
@@ -68,37 +71,35 @@ def train():
             pass
             
     # Resume Training: Load Latest Model if exists
-    if os.path.exists("checkpoints/latest.pt"):
+    if os.path.exists(config.latest_checkpoint):
         print("\n🔄 Checking for existing checkpoint...")
         try:
-            agent.load("checkpoints/latest.pt")
+            agent.load(config.latest_checkpoint)
             print(f"✅ Loaded checkpoint! Resuming from step {agent.steps}")
         except Exception as e:
             print(f"⚠️ Checkpoint incompatible (likely old architecture): {e}")
-            print("📦 Archiving old checkpoints to 'checkpoints/old_v1'...")
-            os.makedirs("checkpoints/old_v1", exist_ok=True)
-            if os.path.exists("checkpoints/latest.pt"):
-                os.rename("checkpoints/latest.pt", "checkpoints/old_v1/latest.pt")
-            if os.path.exists("checkpoints/human_trained.pt"):
+            print(f"📦 Archiving old checkpoints to '{config.archive_dir}'...")
+            archive_checkpoint(config.latest_checkpoint, config.archive_dir)
+            if os.path.exists(config.human_checkpoint):
                  # We keep human trained but maybe rename it if we can't use it?
                  # Actually, we can't use human_trained.pt either if inputs changed!
                  print("⚠️ 'human_trained.pt' is also incompatible. Archiving.")
-                 os.rename("checkpoints/human_trained.pt", "checkpoints/old_v1/human_trained.pt")
+                 archive_checkpoint(config.human_checkpoint, config.archive_dir)
             
             print("🚀 Starting FRESH training with NEW Vision System!")
             
     # Transfer Learning: Load Human Model if exists AND we are not resuming
-    elif os.path.exists("checkpoints/human_trained.pt"):
+    elif os.path.exists(config.human_checkpoint):
         print("\n🎓 FOUND HUMAN-TRAINED MODEL! Importing Knowledge...")
         try:
-            agent.load("checkpoints/human_trained.pt")
+            agent.load(config.human_checkpoint)
             print("✅ Transfer Learning ENABLED.")
             agent.epsilon_start = 0.15
         except Exception as e:
             print(f"⚠️ Human model incompatible: {e}")
             print("🚀 Starting FRESH training.")
     
-    for episode in tqdm(range(1, num_episodes + 1), desc="Training"):
+    for episode in tqdm(range(1, config.num_episodes + 1), desc="Training"):
 
 
         state = env.reset()
@@ -119,7 +120,7 @@ def train():
                 
                 # Epsilon Greedy
                 if random.random() < agent.epsilon():
-                    action = random.randint(0, agent.action_dim - 1)
+                    action = random.randint(0, config.action_dim - 1)
                 else:
                     action = q_values.argmax().item()
             
@@ -156,9 +157,9 @@ def train():
 
         
         # Save checkpoint
-        if episode % save_interval == 0:
-            agent.save(f"checkpoints/mario_ep{episode}.pt")
-            agent.save("checkpoints/latest.pt")
+        if episode % config.save_interval == 0:
+            agent.save(os.path.join(config.checkpoint_dir, f"mario_ep{episode}.pt"))
+            agent.save(config.latest_checkpoint)
             
     print("\n✅ Training complete!")
     env.close()
