@@ -7,10 +7,13 @@ import numpy as np
 import torch
 
 from mario_rl.brain.dqn_brain import SimpleDQNAgent
+from mario_rl.config import DEFAULT_CONFIG
 from mario_rl.env.mario_env import MarioEnv
 from mario_rl.utils.server import start_background_server, update_visualization
 
 def watch():
+    config = DEFAULT_CONFIG
+
     # Start WS Server
     start_background_server()
 
@@ -18,13 +21,18 @@ def watch():
     print(f"👀 Watching Mario on {device}")
     
     # Setup
-    env = MarioEnv(world=1, stage=1, apply_cheats=False)
-    agent = SimpleDQNAgent(state_dim=MarioEnv.STATE_DIM, action_dim=7, device=device)
+    env = MarioEnv(
+        world=config.world,
+        stage=config.stage,
+        max_steps=config.max_steps,
+        apply_cheats=config.apply_cheats,
+    )
+    agent = SimpleDQNAgent(state_dim=config.state_dim, action_dim=config.action_dim, device=device)
     
     # Load Model
-    if os.path.exists("checkpoints/latest.pt"):
+    if os.path.exists(config.latest_checkpoint):
         print("✅ Loading latest model...")
-        agent.load("checkpoints/latest.pt")
+        agent.load(config.latest_checkpoint)
         # Turn off exploration to see what it truly learned
         agent.epsilon_start = 0.05 
         agent.epsilon_end = 0.05
@@ -54,7 +62,7 @@ def watch():
                 
                 # Decision
                 if np.random.random() < agent.epsilon_end:
-                    action = np.random.randint(0, 7)
+                    action = np.random.randint(0, config.action_dim)
                     # We still use the network activations for viz
                 else:
                     action = q_values.argmax().item()
