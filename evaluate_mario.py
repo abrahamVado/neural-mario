@@ -1,16 +1,18 @@
 """Evaluate saved Mario checkpoints over multiple episodes."""
 from __future__ import annotations
 
-import statistics
+import argparse
 
 import torch
 
 from mario_rl.brain.dqn_brain import SimpleDQNAgent
 from mario_rl.config import DEFAULT_CONFIG
 from mario_rl.env.mario_env import MarioEnv
+from mario_rl.utils.formatting import format_evaluation_summary
+from mario_rl.utils.metrics import EvaluationSummary, build_evaluation_summary
 
 
-def evaluate(num_episodes: int = 5) -> dict[str, float]:
+def evaluate(num_episodes: int = 5) -> EvaluationSummary:
     """Run deterministic evaluation episodes and return summary stats."""
     config = DEFAULT_CONFIG
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -50,23 +52,17 @@ def evaluate(num_episodes: int = 5) -> dict[str, float]:
 
     env.close()
 
-    return {
-        "episodes": float(num_episodes),
-        "avg_reward": statistics.fmean(rewards) if rewards else 0.0,
-        "best_reward": max(rewards) if rewards else 0.0,
-        "avg_distance": statistics.fmean(distances) if distances else 0.0,
-        "best_distance": max(distances) if distances else 0.0,
-        "clear_rate": flags_cleared / num_episodes if num_episodes else 0.0,
-    }
+    return build_evaluation_summary(rewards, distances, flags_cleared)
+
+
+def parse_args() -> argparse.Namespace:
+    """Parse CLI args for evaluation."""
+    parser = argparse.ArgumentParser(description="Evaluate a Mario checkpoint.")
+    parser.add_argument("--episodes", type=int, default=5, help="Number of evaluation episodes to run.")
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    summary = evaluate()
-    print("Mario checkpoint evaluation")
-    for key, value in summary.items():
-        if key in {"episodes", "best_distance"}:
-            print(f"{key}: {int(value)}")
-        elif key == "clear_rate":
-            print(f"{key}: {value:.0%}")
-        else:
-            print(f"{key}: {value:.2f}")
+    args = parse_args()
+    summary = evaluate(num_episodes=args.episodes)
+    print(format_evaluation_summary(summary))
