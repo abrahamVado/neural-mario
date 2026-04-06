@@ -9,6 +9,7 @@ import torch
 from mario_rl.brain.dqn_brain import SimpleDQNAgent
 from mario_rl.config import DEFAULT_CONFIG
 from mario_rl.env.mario_env import MarioEnv
+from mario_rl.utils.actions import action_name
 from mario_rl.utils.server import start_background_server, update_visualization
 
 def watch():
@@ -45,6 +46,7 @@ def watch():
     while True:
         state = env.reset()
         done = False
+        action = 0
         total_reward = 0
         
         while not done:
@@ -77,6 +79,7 @@ def watch():
             time.sleep(0.01) # Game speed control
             
         print(f"Game Over! Reward: {total_reward:.1f}")
+        print(f"Last action policy label: {action_name(action)}")
         time.sleep(1.0)
 
 if __name__ == "__main__":
