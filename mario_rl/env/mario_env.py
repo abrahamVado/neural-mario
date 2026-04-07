@@ -3,10 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-import gym_super_mario_bros
 import numpy as np
-from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
-from nes_py.wrappers import JoypadSpace
 
 
 class MarioEnv:
@@ -42,8 +39,9 @@ class MarioEnv:
 
         # Create Super Mario Bros environment
         import gym_super_mario_bros
-        from nes_py.wrappers import JoypadSpace
         import gym
+        from gym_super_mario_bros.actions import SIMPLE_MOVEMENT
+        from nes_py.wrappers import JoypadSpace
         
         # Create base environment
         base_env = gym_super_mario_bros.make(f'SuperMarioBros-{world}-{stage}-v0')
